@@ -68,6 +68,21 @@ import { DocumentCardSmallComponent } from './document-card-small/document-card-
 import { FilterEditorComponent } from './filter-editor/filter-editor.component'
 import { SaveViewConfigDialogComponent } from './save-view-config-dialog/save-view-config-dialog.component'
 
+type DocumentGroupBy =
+  | 'storagePathFolders'
+  | 'storagePath'
+  | 'correspondent'
+  | 'documentType'
+  | 'createdYear'
+  | 'createdMonth'
+
+interface DocumentGroup {
+  key: string
+  label: string
+  documents: Document[]
+  entityId?: number
+}
+
 @Component({
   selector: 'pngx-document-list',
   templateUrl: './document-list.component.html',
@@ -121,6 +136,16 @@ export class DocumentListComponent
   DisplayField = DisplayField
   DisplayMode = DisplayMode
 
+  groupBy: DocumentGroupBy = 'storagePathFolders'
+  groupByOptions: { id: DocumentGroupBy; name: string }[] = [
+    { id: 'storagePathFolders', name: $localize`Storage path folders` },
+    { id: 'storagePath', name: $localize`Storage path` },
+    { id: 'correspondent', name: $localize`Correspondent` },
+    { id: 'documentType', name: $localize`Document type` },
+    { id: 'createdYear', name: $localize`Created year` },
+    { id: 'createdMonth', name: $localize`Created month` },
+  ]
+
   @ViewChild('filterEditor')
   private filterEditor: FilterEditorComponent
 
@@ -160,10 +185,11 @@ export class DocumentListComponent
         (this.unmodifiedSavedView.page_size &&
           this.unmodifiedSavedView.page_size !== this.list.pageSize) ||
         (this.unmodifiedSavedView.display_mode &&
-          this.unmodifiedSavedView.display_mode !== this.list.displayMode) ||
+          this.unmodifiedSavedView.display_mode !==
+            this.getPersistableDisplayMode()) ||
         // if the saved view has no display mode, we assume it's small cards
         (!this.unmodifiedSavedView.display_mode &&
-          this.list.displayMode !== DisplayMode.SMALL_CARDS) ||
+          this.getPersistableDisplayMode() !== DisplayMode.SMALL_CARDS) ||
         (this.unmodifiedSavedView.display_fields &&
           this.unmodifiedSavedView.display_fields.join(',') !==
             this.activeDisplayFields.join(',')) ||
@@ -214,6 +240,93 @@ export class DocumentListComponent
 
   get isBulkEditing(): boolean {
     return this.list.selected.size > 0
+  }
+
+  get groupedDocuments(): DocumentGroup[] {
+    if (!this.list.documents?.length) {
+      return []
+    }
+
+    const groups = new Map<string, DocumentGroup>()
+
+    for (const document of this.list.documents) {
+      let key = ''
+      let label = ''
+      let entityId: number | undefined
+
+      switch (this.groupBy) {
+        case 'storagePath': {
+          entityId = document.storage_path
+          key = entityId?.toString() ?? '__none'
+          label = entityId ? `#${entityId}` : $localize`No storage path`
+          break
+        }
+        case 'correspondent': {
+          entityId = document.correspondent
+          key = entityId?.toString() ?? '__none'
+          label = entityId ? `#${entityId}` : $localize`No correspondent`
+          break
+        }
+        case 'documentType': {
+          entityId = document.document_type
+          key = entityId?.toString() ?? '__none'
+          label = entityId ? `#${entityId}` : $localize`No document type`
+          break
+        }
+        case 'createdYear': {
+          const created = this.parseDate(document.created)
+          key = created ? created.getUTCFullYear().toString() : '__none'
+          label = created ? key : $localize`No date`
+          break
+        }
+        case 'createdMonth': {
+          const created = this.parseDate(document.created)
+          if (created) {
+            const month = (created.getUTCMonth() + 1)
+              .toString()
+              .padStart(2, '0')
+            key = `${created.getUTCFullYear()}-${month}`
+            label = key
+          } else {
+            key = '__none'
+            label = $localize`No date`
+          }
+          break
+        }
+        default: {
+          key = this.getArchivedFolderPath(document)
+          label = key || $localize`Root`
+          break
+        }
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, { key, label, documents: [], entityId })
+      }
+      groups.get(key)!.documents.push(document)
+    }
+
+    return Array.from(groups.values())
+  }
+
+  private parseDate(value?: Date | string | null): Date | null {
+    if (!value) return null
+    const parsed = value instanceof Date ? value : new Date(value)
+    return isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  private getArchivedFolderPath(document: Document): string {
+    const archivedFileName = document.archived_file_name?.replace(/\\/g, '/')
+    if (!archivedFileName || !archivedFileName.includes('/')) {
+      return ''
+    }
+    return archivedFileName.substring(0, archivedFileName.lastIndexOf('/'))
+  }
+
+  private getPersistableDisplayMode(): DisplayMode {
+    return this.list.displayMode === DisplayMode.FOLDERS
+      ? DisplayMode.SMALL_CARDS
+      : this.list.displayMode
   }
 
   toggleDisplayField(field: DisplayField) {
@@ -372,7 +485,7 @@ export class DocumentListComponent
         filter_rules: this.list.filterRules,
         sort_field: this.list.sortField,
         sort_reverse: this.list.sortReverse,
-        display_mode: this.list.displayMode,
+        display_mode: this.getPersistableDisplayMode(),
         display_fields: this.activeDisplayFields,
       }
       this.savedViewService
@@ -423,7 +536,7 @@ export class DocumentListComponent
         filter_rules: this.list.filterRules,
         sort_reverse: this.list.sortReverse,
         sort_field: this.list.sortField,
-        display_mode: this.list.displayMode,
+        display_mode: this.getPersistableDisplayMode(),
         display_fields: this.activeDisplayFields,
       }
 

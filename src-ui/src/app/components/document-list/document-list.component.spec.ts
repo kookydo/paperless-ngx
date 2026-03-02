@@ -283,11 +283,13 @@ describe('DocumentListComponent', () => {
     expect(setCountSpy).toHaveBeenCalledWith(expect.any(Object), 3)
   })
 
-  it('should support 3 different display modes', () => {
+  it('should support display modes including folders', () => {
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     fixture.detectChanges()
     const displayModeButtons = fixture.debugElement.queryAll(
-      By.css('input[type="radio"]')
+      By.css(
+        'input[name="displayModeDetails"], input[name="displayModeSmall"], input[name="displayModeLarge"], input[name="displayModeFolders"]'
+      )
     )
     expect(component.list.displayMode).toEqual('smallCards')
 
@@ -312,6 +314,12 @@ describe('DocumentListComponent', () => {
     expect(
       fixture.debugElement.queryAll(By.directive(DocumentCardLargeComponent))
     ).toHaveLength(3)
+
+    displayModeButtons[3].nativeElement.checked = true
+    displayModeButtons[3].triggerEventHandler('change')
+    fixture.detectChanges()
+    expect(component.list.displayMode).toEqual(DisplayMode.FOLDERS)
+    expect(fixture.nativeElement.textContent).toContain('Root')
   })
 
   it('should support setting sort field', () => {

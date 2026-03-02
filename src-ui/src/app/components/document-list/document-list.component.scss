@@ -80,3 +80,16 @@ a {
 pngx-page-header .dropdown-menu {
   --bs-dropdown-min-width: 12em;
 }
+
+.folder-document {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.folder-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-body-tertiary);
+}
