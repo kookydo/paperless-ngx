@@ -10,6 +10,8 @@ ARG TARGETARCH
 # Can be workflow provided, defaults set for manual building
 ARG JBIG2ENC_VERSION=0.30
 
+RUN mkdir -p /cache/uv && chmod -R 777 /cache
+
 # Set Python environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
