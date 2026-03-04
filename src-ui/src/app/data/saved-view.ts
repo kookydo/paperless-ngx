@@ -1,4 +1,4 @@
-import { DisplayField, DisplayMode } from './document'
+import { DisplayField, DisplayMode, DocumentGroupBy } from './document'
 import { FilterRule } from './filter-rule'
 import { ObjectWithPermissions } from './object-with-permissions'
 
@@ -20,4 +20,6 @@ export interface SavedView extends ObjectWithPermissions {
   display_mode?: DisplayMode
 
   display_fields?: DisplayField[]
+
+  group_by?: DocumentGroupBy
 }

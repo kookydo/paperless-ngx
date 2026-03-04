@@ -46,6 +46,7 @@ services:
       - /usr/src/paperless/paperless-ngx/.ruff_cache
       - /usr/src/paperless/paperless-ngx/htmlcov
       - /usr/src/paperless/paperless-ngx/.coverage
+      - node_modules:/usr/src/paperless/paperless-ngx/src-ui/node_modules
       - ./data:/usr/src/paperless/paperless-ngx/data
       - ./media:/usr/src/paperless/paperless-ngx/media
       - ./consume:/usr/src/paperless/paperless-ngx/consume
@@ -75,3 +76,4 @@ volumes:
   media:
   redisdata:
   virtualenv:
+  node_modules:

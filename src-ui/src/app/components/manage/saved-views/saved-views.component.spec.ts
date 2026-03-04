@@ -142,6 +142,7 @@ describe('SavedViewsComponent', () => {
     expect(patchSpy).toHaveBeenCalledWith([
       {
         id: view.id,
+        group_by: 'none',
         name: view.name,
         show_in_sidebar: view.show_in_sidebar,
         show_on_dashboard: !view.show_on_dashboard,

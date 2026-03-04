@@ -283,12 +283,12 @@ describe('DocumentListComponent', () => {
     expect(setCountSpy).toHaveBeenCalledWith(expect.any(Object), 3)
   })
 
-  it('should support display modes including folders', () => {
+  it('should support display modes and grouping', () => {
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     fixture.detectChanges()
     const displayModeButtons = fixture.debugElement.queryAll(
       By.css(
-        'input[name="displayModeDetails"], input[name="displayModeSmall"], input[name="displayModeLarge"], input[name="displayModeFolders"]'
+        'input[name="displayModeDetails"], input[name="displayModeSmall"], input[name="displayModeLarge"]'
       )
     )
     expect(component.list.displayMode).toEqual('smallCards')
@@ -315,11 +315,10 @@ describe('DocumentListComponent', () => {
       fixture.debugElement.queryAll(By.directive(DocumentCardLargeComponent))
     ).toHaveLength(3)
 
-    displayModeButtons[3].nativeElement.checked = true
-    displayModeButtons[3].triggerEventHandler('change')
+    component.onGroupByChange('storagePath')
     fixture.detectChanges()
-    expect(component.list.displayMode).toEqual(DisplayMode.FOLDERS)
-    expect(fixture.nativeElement.textContent).toContain('Root')
+    expect(component.isGroupingEnabled).toBeTruthy()
+    expect(fixture.nativeElement.textContent).toContain('No storage path')
   })
 
   it('should support setting sort field', () => {
@@ -337,6 +336,7 @@ describe('DocumentListComponent', () => {
   })
 
   it('should support setting sort field by table head', () => {
+    component.onGroupByChange('none')
     component.activeDisplayFields = [DisplayField.ASN]
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     fixture.detectChanges()
@@ -451,7 +451,10 @@ describe('DocumentListComponent', () => {
     const toastSpy = jest.spyOn(toastService, 'showInfo')
 
     component.saveViewConfig()
-    expect(savedViewServicePatch).toHaveBeenCalledWith(modifiedView)
+    expect(savedViewServicePatch).toHaveBeenCalledWith({
+      ...modifiedView,
+      group_by: 'none',
+    })
     expect(toastSpy).toHaveBeenCalledWith(
       `View "${view.name}" saved successfully.`
     )
@@ -617,6 +620,7 @@ describe('DocumentListComponent', () => {
   })
 
   it('should hide columns if no perms or notes disabled', () => {
+    component.onGroupByChange('none')
     jest.spyOn(permissionService, 'currentUserCan').mockReturnValue(true)
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     expect(documentListService.sortField).toEqual('created')

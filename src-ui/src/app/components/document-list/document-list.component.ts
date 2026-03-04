@@ -28,6 +28,7 @@ import {
   DisplayField,
   DisplayMode,
   Document,
+  DocumentGroupBy,
 } from 'src/app/data/document'
 import { FilterRule } from 'src/app/data/filter-rule'
 import { FILTER_FULLTEXT_MORELIKE } from 'src/app/data/filter-rule-type'
@@ -68,20 +69,35 @@ import { DocumentCardSmallComponent } from './document-card-small/document-card-
 import { FilterEditorComponent } from './filter-editor/filter-editor.component'
 import { SaveViewConfigDialogComponent } from './save-view-config-dialog/save-view-config-dialog.component'
 
-type DocumentGroupBy =
-  | 'storagePathFolders'
-  | 'storagePath'
-  | 'correspondent'
-  | 'documentType'
-  | 'createdYear'
-  | 'createdMonth'
-
 interface DocumentGroup {
   key: string
   label: string
   documents: Document[]
   entityId?: number
 }
+
+interface FolderTreeNode {
+  key: string
+  label: string
+  depth: number
+  children: Map<string, FolderTreeNode>
+  documents: Document[]
+}
+
+type FolderTableRow =
+  | {
+      type: 'node'
+      key: string
+      label: string
+      depth: number
+      count: number
+    }
+  | {
+      type: 'document'
+      key: string
+      depth: number
+      document: Document
+    }
 
 @Component({
   selector: 'pngx-document-list',
@@ -136,9 +152,8 @@ export class DocumentListComponent
   DisplayField = DisplayField
   DisplayMode = DisplayMode
 
-  groupBy: DocumentGroupBy = 'storagePathFolders'
   groupByOptions: { id: DocumentGroupBy; name: string }[] = [
-    { id: 'storagePathFolders', name: $localize`Storage path folders` },
+    { id: 'none', name: $localize`None` },
     { id: 'storagePath', name: $localize`Storage path` },
     { id: 'correspondent', name: $localize`Correspondent` },
     { id: 'documentType', name: $localize`Document type` },
@@ -159,7 +174,17 @@ export class DocumentListComponent
     this.list.displayFields = fields
     this.updateDisplayCustomFields()
   }
+
+  get groupBy(): DocumentGroupBy {
+    return this.list.groupBy
+  }
+
+  set groupBy(groupBy: DocumentGroupBy) {
+    this.list.groupBy = groupBy
+  }
   activeDisplayCustomFields: Set<string> = new Set()
+  collapsedGroups: Set<string> = new Set()
+  initializedGroupStates: Set<string> = new Set()
 
   public updateDisplayCustomFields() {
     this.activeDisplayCustomFields = new Set(
@@ -198,6 +223,7 @@ export class DocumentListComponent
             DEFAULT_DISPLAY_FIELDS.filter((f) => f.id !== DisplayField.ADDED)
               .map((f) => f.id)
               .join(',')) ||
+        (this.unmodifiedSavedView.group_by ?? 'none') !== this.groupBy ||
         filterRulesDiffer(
           this.unmodifiedSavedView.filter_rules,
           this.list.filterRules
@@ -242,7 +268,14 @@ export class DocumentListComponent
     return this.list.selected.size > 0
   }
 
+  get isGroupingEnabled(): boolean {
+    return this.groupBy !== 'none'
+  }
+
   get groupedDocuments(): DocumentGroup[] {
+    if (!this.isGroupingEnabled) {
+      return []
+    }
     if (!this.list.documents?.length) {
       return []
     }
@@ -256,9 +289,14 @@ export class DocumentListComponent
 
       switch (this.groupBy) {
         case 'storagePath': {
-          entityId = document.storage_path
-          key = entityId?.toString() ?? '__none'
-          label = entityId ? `#${entityId}` : $localize`No storage path`
+          const resolvedPath = this.getArchivedFolderPath(document)
+          if (document.storage_path) {
+            key = resolvedPath || '__root'
+            label = resolvedPath || $localize`No storage path`
+          } else {
+            key = '__none'
+            label = $localize`No storage path`
+          }
           break
         }
         case 'correspondent': {
@@ -306,7 +344,266 @@ export class DocumentListComponent
       groups.get(key)!.documents.push(document)
     }
 
-    return Array.from(groups.values())
+    const groupedDocuments = Array.from(groups.values())
+    const activeGroupStateKeys = new Set(
+      groupedDocuments.map((group) => this.getGroupStateKey(group.key))
+    )
+    this.applyGroupStateDefaults(activeGroupStateKeys)
+    return groupedDocuments
+  }
+
+  get isHierarchicalStoragePathGrouping(): boolean {
+    return this.isGroupingEnabled && this.groupBy === 'storagePath'
+  }
+
+  get folderRows(): FolderTableRow[] {
+    if (!this.isGroupingEnabled) {
+      return []
+    }
+    if (!this.list.documents?.length) {
+      return []
+    }
+
+    const root: FolderTreeNode = {
+      key: '__root__',
+      label: '',
+      depth: -1,
+      children: new Map<string, FolderTreeNode>(),
+      documents: [],
+    }
+
+    for (const document of this.list.documents) {
+      if (this.groupBy === 'storagePath' && !document.storage_path) {
+        this.addDocumentToTree(root, ['No storage path'], document, true)
+        continue
+      }
+
+      const folderPath = this.getArchivedFolderPath(document)
+      const segments = folderPath
+        ? folderPath.split('/').filter(Boolean)
+        : ['Root']
+      this.addDocumentToTree(root, segments, document, false)
+    }
+
+    const rows: FolderTableRow[] = []
+    const activeGroupStateKeys = new Set<string>()
+    this.flattenFolderTree(root, rows, activeGroupStateKeys)
+    this.applyGroupStateDefaults(activeGroupStateKeys)
+    return rows
+  }
+
+  private getGroupStateKey(groupKey: string): string {
+    return `${this.groupBy}:${groupKey}`
+  }
+
+  toggleGroup(groupKey: string) {
+    const stateKey = this.getGroupStateKey(groupKey)
+    if (this.collapsedGroups.has(stateKey)) {
+      this.collapsedGroups.delete(stateKey)
+    } else {
+      this.collapsedGroups.add(stateKey)
+    }
+  }
+
+  isGroupCollapsed(groupKey: string): boolean {
+    return this.collapsedGroups.has(this.getGroupStateKey(groupKey))
+  }
+
+  collapseAllGroups() {
+    const groupKeys = this.isHierarchicalStoragePathGrouping
+      ? this.folderRows
+          .filter((row) => row.type === 'node')
+          .map((row) => row.key)
+      : this.groupedDocuments.map((group) => group.key)
+    this.collapsedGroups = new Set(
+      groupKeys.map((groupKey) => this.getGroupStateKey(groupKey))
+    )
+  }
+
+  expandAllGroups() {
+    this.collapsedGroups.clear()
+  }
+
+  getDocumentFromFolderRow(row: FolderTableRow): Document | null {
+    return row.type === 'document' ? row.document : null
+  }
+
+  get folderGroupHeaderColspan(): number {
+    let count = 1 // selection checkbox
+    if (this.activeDisplayFields.includes(DisplayField.ASN)) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.CORRESPONDENT) &&
+      this.permissionService.currentUserCan(
+        this.PermissionAction.View,
+        this.PermissionType.Correspondent
+      )
+    ) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.TITLE) ||
+      this.activeDisplayFields.includes(DisplayField.TAGS)
+    ) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.OWNER) &&
+      this.permissionService.currentUserCan(
+        this.PermissionAction.View,
+        this.PermissionType.User
+      )
+    ) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.NOTES) &&
+      this.notesEnabled
+    ) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.DOCUMENT_TYPE) &&
+      this.permissionService.currentUserCan(
+        this.PermissionAction.View,
+        this.PermissionType.DocumentType
+      )
+    ) {
+      count++
+    }
+    if (
+      this.activeDisplayFields.includes(DisplayField.STORAGE_PATH) &&
+      this.permissionService.currentUserCan(
+        this.PermissionAction.View,
+        this.PermissionType.StoragePath
+      )
+    ) {
+      count++
+    }
+    if (this.activeDisplayFields.includes(DisplayField.CREATED)) {
+      count++
+    }
+    if (this.activeDisplayFields.includes(DisplayField.ADDED)) {
+      count++
+    }
+    if (this.activeDisplayFields.includes(DisplayField.PAGE_COUNT)) {
+      count++
+    }
+    if (this.activeDisplayFields.includes(DisplayField.SHARED)) {
+      count++
+    }
+    count += this.activeDisplayCustomFields.size
+    return count
+  }
+
+  onGroupByChange(groupBy: DocumentGroupBy) {
+    this.groupBy = groupBy
+    this.collapsedGroups.clear()
+    this.initializedGroupStates.clear()
+  }
+
+  private addDocumentToTree(
+    root: FolderTreeNode,
+    segments: string[],
+    document: Document,
+    noStoragePath: boolean
+  ) {
+    let current = root
+    let currentKey = ''
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]
+      const segmentLabel = this.getPathSegmentLabel(segment)
+      currentKey = noStoragePath
+        ? '__none'
+        : segment === 'Root'
+          ? '__root'
+          : currentKey
+            ? `${currentKey}/${segment}`
+            : segment
+      if (!current.children.has(segmentLabel)) {
+        current.children.set(segmentLabel, {
+          key: currentKey,
+          label: segmentLabel,
+          depth: i,
+          children: new Map<string, FolderTreeNode>(),
+          documents: [],
+        })
+      }
+      current = current.children.get(segmentLabel)!
+    }
+    current.documents.push(document)
+  }
+
+  private flattenFolderTree(
+    node: FolderTreeNode,
+    rows: FolderTableRow[],
+    activeGroupStateKeys: Set<string>
+  ) {
+    const children = Array.from(node.children.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { numeric: true })
+    )
+
+    for (const child of children) {
+      const count = this.getTreeDocumentCount(child)
+      rows.push({
+        type: 'node',
+        key: child.key,
+        label: child.label,
+        depth: child.depth,
+        count,
+      })
+      const stateKey = this.getGroupStateKey(child.key)
+      activeGroupStateKeys.add(stateKey)
+      if (this.isGroupCollapsed(child.key)) {
+        continue
+      }
+      this.flattenFolderTree(child, rows, activeGroupStateKeys)
+      child.documents.forEach((document) =>
+        rows.push({
+          type: 'document',
+          key: `${child.key}:${document.id}`,
+          depth: child.depth + 1,
+          document,
+        })
+      )
+    }
+  }
+
+  private getTreeDocumentCount(node: FolderTreeNode): number {
+    let count = node.documents.length
+    node.children.forEach((child) => {
+      count += this.getTreeDocumentCount(child)
+    })
+    return count
+  }
+
+  private getPathSegmentLabel(segment: string): string {
+    if (segment?.toLowerCase() === 'none') {
+      return $localize`No value`
+    }
+    return segment
+  }
+
+  private applyGroupStateDefaults(activeGroupStateKeys: Set<string>) {
+    this.initializedGroupStates = new Set(
+      Array.from(this.initializedGroupStates).filter((key) =>
+        activeGroupStateKeys.has(key)
+      )
+    )
+    this.collapsedGroups = new Set(
+      Array.from(this.collapsedGroups).filter((key) =>
+        activeGroupStateKeys.has(key)
+      )
+    )
+
+    activeGroupStateKeys.forEach((stateKey) => {
+      if (!this.initializedGroupStates.has(stateKey)) {
+        // Default: newly seen groups start collapsed.
+        this.collapsedGroups.add(stateKey)
+        this.initializedGroupStates.add(stateKey)
+      }
+    })
   }
 
   private parseDate(value?: Date | string | null): Date | null {
@@ -316,17 +613,17 @@ export class DocumentListComponent
   }
 
   private getArchivedFolderPath(document: Document): string {
-    const archivedFileName = document.archived_file_name?.replace(/\\/g, '/')
-    if (!archivedFileName || !archivedFileName.includes('/')) {
+    const archivedPath = (
+      document.archived_file_path ?? document.archived_file_name
+    )?.replace(/\\/g, '/')
+    if (!archivedPath || !archivedPath.includes('/')) {
       return ''
     }
-    return archivedFileName.substring(0, archivedFileName.lastIndexOf('/'))
+    return archivedPath.substring(0, archivedPath.lastIndexOf('/'))
   }
 
   private getPersistableDisplayMode(): DisplayMode {
-    return this.list.displayMode === DisplayMode.FOLDERS
-      ? DisplayMode.SMALL_CARDS
-      : this.list.displayMode
+    return this.list.displayMode
   }
 
   toggleDisplayField(field: DisplayField) {
@@ -487,6 +784,7 @@ export class DocumentListComponent
         sort_reverse: this.list.sortReverse,
         display_mode: this.getPersistableDisplayMode(),
         display_fields: this.activeDisplayFields,
+        group_by: this.groupBy,
       }
       this.savedViewService
         .patch(savedView)
@@ -538,6 +836,7 @@ export class DocumentListComponent
         sort_field: this.list.sortField,
         display_mode: this.getPersistableDisplayMode(),
         display_fields: this.activeDisplayFields,
+        group_by: this.groupBy,
       }
 
       this.savedViewService
