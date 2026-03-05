@@ -80,3 +80,14 @@ a {
 pngx-page-header .dropdown-menu {
   --bs-dropdown-min-width: 12em;
 }
+
+.folder-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bs-body-tertiary);
+
+  .btn {
+    color: inherit;
+  }
+}

@@ -8,7 +8,7 @@ import {
 } from '@angular/forms'
 import { dirtyCheck } from '@ngneat/dirty-check-forms'
 import { BehaviorSubject, Observable, takeUntil } from 'rxjs'
-import { DisplayMode } from 'src/app/data/document'
+import { DisplayMode, DocumentGroupBy } from 'src/app/data/document'
 import { SavedView } from 'src/app/data/saved-view'
 import { IfPermissionsDirective } from 'src/app/directives/if-permissions.directive'
 import { SavedViewService } from 'src/app/services/rest/saved-view.service'
@@ -45,6 +45,14 @@ export class SavedViewsComponent
   private toastService = inject(ToastService)
 
   DisplayMode = DisplayMode
+  groupByOptions: { id: DocumentGroupBy; name: string }[] = [
+    { id: 'none', name: $localize`None` },
+    { id: 'storagePath', name: $localize`Storage path` },
+    { id: 'correspondent', name: $localize`Correspondent` },
+    { id: 'documentType', name: $localize`Document type` },
+    { id: 'createdYear', name: $localize`Created year` },
+    { id: 'createdMonth', name: $localize`Created month` },
+  ]
 
   public savedViews: SavedView[]
   private savedViewsGroup = new FormGroup({})
@@ -94,6 +102,7 @@ export class SavedViewsComponent
         page_size: view.page_size,
         display_mode: view.display_mode,
         display_fields: view.display_fields,
+        group_by: view.group_by ?? 'none',
       }
       this.savedViewsGroup.addControl(
         view.id.toString(),
@@ -105,6 +114,7 @@ export class SavedViewsComponent
           page_size: new FormControl(null),
           display_mode: new FormControl(null),
           display_fields: new FormControl([]),
+          group_by: new FormControl('none'),
         })
       )
     }

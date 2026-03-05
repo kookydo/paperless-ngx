@@ -6,6 +6,7 @@ import {
   DisplayField,
   DisplayMode,
   Document,
+  DocumentGroupBy,
 } from '../data/document'
 import { FilterRule } from '../data/filter-rule'
 import { SavedView } from '../data/saved-view'
@@ -79,6 +80,11 @@ export interface ListViewState {
    * The fields to display in the document list.
    */
   displayFields?: DisplayField[]
+
+  /**
+   * Grouping mode for the list.
+   */
+  groupBy?: DocumentGroupBy
 }
 
 /**
@@ -165,6 +171,7 @@ export class DocumentListViewService {
       sortReverse: true,
       filterRules: [],
       selected: new Set<number>(),
+      groupBy: 'none',
     }
   }
 
@@ -212,6 +219,7 @@ export class DocumentListViewService {
     this.activeListViewState.displayMode = view.display_mode
     this.activeListViewState.pageSize = view.page_size
     this.activeListViewState.displayFields = view.display_fields
+    this.activeListViewState.groupBy = this.normalizeGroupBy(view.group_by)
 
     this.reduceSelectionToFilter()
 
@@ -428,7 +436,20 @@ export class DocumentListViewService {
       // legacy
       return DisplayMode.TABLE
     }
+    if (mode === DisplayMode.FOLDERS) {
+      // legacy from custom builds
+      return DisplayMode.TABLE
+    }
     return mode
+  }
+
+  set groupBy(groupBy: DocumentGroupBy) {
+    this.activeListViewState.groupBy = this.normalizeGroupBy(groupBy)
+    this.saveDocumentListView()
+  }
+
+  get groupBy(): DocumentGroupBy {
+    return this.normalizeGroupBy(this.activeListViewState.groupBy)
   }
 
   set pageSize(size: number) {
@@ -469,6 +490,7 @@ export class DocumentListViewService {
         sortReverse: this.activeListViewState.sortReverse,
         displayMode: this.activeListViewState.displayMode,
         displayFields: this.activeListViewState.displayFields,
+        groupBy: this.activeListViewState.groupBy,
       }
       localStorage.setItem(
         DOCUMENT_LIST_SERVICE.CURRENT_VIEW_CONFIG,
@@ -633,5 +655,14 @@ export class DocumentListViewService {
 
   documentIndexInCurrentView(documentID: number): number {
     return this.documents.map((d) => d.id).indexOf(documentID)
+  }
+
+  private normalizeGroupBy(
+    groupBy?: DocumentGroupBy | string
+  ): DocumentGroupBy {
+    if (groupBy === 'storagePathFolders') {
+      return 'storagePath'
+    }
+    return (groupBy as DocumentGroupBy) ?? 'none'
   }
 }

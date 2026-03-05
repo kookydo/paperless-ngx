@@ -454,6 +454,14 @@ class SavedView(ModelWithOwner):
         PAGE_COUNT = ("pagecount", _("Pages"))
         CUSTOM_FIELD = ("custom_field_%d", ("Custom Field"))
 
+    class GroupBy(models.TextChoices):
+        NONE = ("none", _("None"))
+        STORAGE_PATH = ("storagePath", _("Storage path"))
+        CORRESPONDENT = ("correspondent", _("Correspondent"))
+        DOCUMENT_TYPE = ("documentType", _("Document type"))
+        CREATED_YEAR = ("createdYear", _("Created year"))
+        CREATED_MONTH = ("createdMonth", _("Created month"))
+
     name = models.CharField(_("name"), max_length=128)
 
     show_on_dashboard = models.BooleanField(
@@ -488,6 +496,14 @@ class SavedView(ModelWithOwner):
 
     display_fields = models.JSONField(
         verbose_name=_("Document display fields"),
+        null=True,
+        blank=True,
+    )
+
+    group_by = models.CharField(
+        max_length=128,
+        verbose_name=_("View group by"),
+        choices=GroupBy.choices,
         null=True,
         blank=True,
     )
