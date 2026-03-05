@@ -123,6 +123,12 @@ test('sorting', async ({ page }) => {
     .click()
   await expect(page).toHaveURL(/sort=document_type__name/)
   await page.getByRole('button', { name: 'Sort' }).click()
+  await page
+    .locator('pngx-page-header')
+    .getByRole('button', { name: 'Storage path' })
+    .click()
+  await expect(page).toHaveURL(/sort=storage_path__name/)
+  await page.getByRole('button', { name: 'Sort' }).click()
   await page.getByRole('button', { name: 'Created', exact: true }).click()
   await expect(page).toHaveURL(/sort=created/)
   await page.getByRole('button', { name: 'Sort' }).click()

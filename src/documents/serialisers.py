@@ -1077,6 +1077,7 @@ class DocumentSerializer(
 
     original_file_name = SerializerMethodField()
     archived_file_name = SerializerMethodField()
+    archived_file_path = SerializerMethodField()
     created_date = serializers.DateField(required=False)
     page_count = SerializerMethodField()
     duplicate_documents = SerializerMethodField()
@@ -1163,6 +1164,12 @@ class DocumentSerializer(
     def get_archived_file_name(self, obj) -> str | None:
         if obj.has_archive_version:
             return obj.get_public_filename(archive=True)
+        else:
+            return None
+
+    def get_archived_file_path(self, obj) -> str | None:
+        if obj.has_archive_version:
+            return str(obj.archive_filename)
         else:
             return None
 
@@ -1336,6 +1343,7 @@ class DocumentSerializer(
             "archive_serial_number",
             "original_file_name",
             "archived_file_name",
+            "archived_file_path",
             "duplicate_documents",
             "owner",
             "permissions",
@@ -1434,6 +1442,7 @@ class SavedViewSerializer(OwnedObjectSerializer):
             "page_size",
             "display_mode",
             "display_fields",
+            "group_by",
             "owner",
             "permissions",
             "user_can_change",

@@ -150,6 +150,7 @@ describe('SavedViewsComponent', () => {
     const patchBody = patchSpy.mock.calls[0][0][0]
     expect(patchBody).toMatchObject({
       id: view.id,
+        group_by: 'none',
       name: 'changed-view-name',
     })
     expect(patchBody.show_on_dashboard).toBeUndefined()

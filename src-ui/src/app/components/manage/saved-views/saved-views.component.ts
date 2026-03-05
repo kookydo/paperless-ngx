@@ -11,7 +11,7 @@ import { dirtyCheck } from '@ngneat/dirty-check-forms'
 import { NgxBootstrapIconsModule } from 'ngx-bootstrap-icons'
 import { BehaviorSubject, Observable, of, switchMap, takeUntil } from 'rxjs'
 import { PermissionsDialogComponent } from 'src/app/components/common/permissions-dialog/permissions-dialog.component'
-import { DisplayMode } from 'src/app/data/document'
+import { DisplayMode, DocumentGroupBy } from 'src/app/data/document'
 import { SavedView } from 'src/app/data/saved-view'
 import { IfPermissionsDirective } from 'src/app/directives/if-permissions.directive'
 import {
@@ -55,6 +55,14 @@ export class SavedViewsComponent
   private readonly modalService = inject(NgbModal)
 
   DisplayMode = DisplayMode
+  groupByOptions: { id: DocumentGroupBy; name: string }[] = [
+    { id: 'none', name: $localize`None` },
+    { id: 'storagePath', name: $localize`Storage path` },
+    { id: 'correspondent', name: $localize`Correspondent` },
+    { id: 'documentType', name: $localize`Document type` },
+    { id: 'createdYear', name: $localize`Created year` },
+    { id: 'createdMonth', name: $localize`Created month` },
+  ]
 
   public savedViews: SavedView[]
   private savedViewsGroup = new FormGroup({})
@@ -110,6 +118,7 @@ export class SavedViewsComponent
         page_size: view.page_size,
         display_mode: view.display_mode,
         display_fields: view.display_fields,
+        group_by: view.group_by ?? 'none',
       }
       const canEdit = this.canEditSavedView(view)
       this.savedViewsGroup.addControl(
@@ -125,6 +134,7 @@ export class SavedViewsComponent
           page_size: new FormControl({ value: null, disabled: !canEdit }),
           display_mode: new FormControl({ value: null, disabled: !canEdit }),
           display_fields: new FormControl({ value: [], disabled: !canEdit }),
+          group_by: new FormControl('none'),
         })
       )
     }

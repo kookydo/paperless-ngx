@@ -116,6 +116,14 @@ export class DocumentService extends AbstractPaperlessService<Document> {
     if (
       !this.permissionsService.currentUserCan(
         PermissionAction.View,
+        PermissionType.StoragePath
+      )
+    ) {
+      excludes.push('storage_path__name')
+    }
+    if (
+      !this.permissionsService.currentUserCan(
+        PermissionAction.View,
         PermissionType.User
       )
     ) {

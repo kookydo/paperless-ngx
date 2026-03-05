@@ -399,6 +399,9 @@ it('should construct sort fields respecting permissions', () => {
     service.sortFields.find((f) => f.field === 'document_type__name')
   ).not.toBeUndefined()
   expect(
+    service.sortFields.find((f) => f.field === 'storage_path__name')
+  ).not.toBeUndefined()
+  expect(
     service.sortFields.find((f) => f.field === 'owner')
   ).not.toBeUndefined()
 
@@ -406,9 +409,12 @@ it('should construct sort fields respecting permissions', () => {
   service['setupSortFields']()
   const fields = DOCUMENT_SORT_FIELDS.filter(
     (f) =>
-      ['correspondent__name', 'document_type__name', 'owner'].indexOf(
-        f.field
-      ) === -1
+      [
+        'correspondent__name',
+        'document_type__name',
+        'storage_path__name',
+        'owner',
+      ].indexOf(f.field) === -1
   )
   expect(service.sortFields).toEqual(fields)
   expect(service.sortFieldsFullText).toEqual([

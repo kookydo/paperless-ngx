@@ -316,11 +316,13 @@ describe('DocumentListComponent', () => {
     expect(reloadSpy).not.toHaveBeenCalled()
   })
 
-  it('should support 3 different display modes', () => {
+  it('should support display modes and grouping', () => {
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     fixture.detectChanges()
     const displayModeButtons = fixture.debugElement.queryAll(
-      By.css('input[type="radio"]')
+      By.css(
+        'input[name="displayModeDetails"], input[name="displayModeSmall"], input[name="displayModeLarge"]'
+      )
     )
     expect(component.list.displayMode).toEqual('smallCards')
 
@@ -345,6 +347,11 @@ describe('DocumentListComponent', () => {
     expect(
       fixture.debugElement.queryAll(By.directive(DocumentCardLargeComponent))
     ).toHaveLength(3)
+
+    component.onGroupByChange('storagePath')
+    fixture.detectChanges()
+    expect(component.isGroupingEnabled).toBeTruthy()
+    expect(fixture.nativeElement.textContent).toContain('No storage path')
   })
 
   it('should support setting sort field', () => {
@@ -362,6 +369,7 @@ describe('DocumentListComponent', () => {
   })
 
   it('should support setting sort field by table head', () => {
+    component.onGroupByChange('none')
     component.activeDisplayFields = [DisplayField.ASN]
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     fixture.detectChanges()
@@ -476,7 +484,10 @@ describe('DocumentListComponent', () => {
     const toastSpy = jest.spyOn(toastService, 'showInfo')
 
     component.saveViewConfig()
-    expect(savedViewServicePatch).toHaveBeenCalledWith(modifiedView)
+    expect(savedViewServicePatch).toHaveBeenCalledWith({
+      ...modifiedView,
+      group_by: 'none',
+    })
     expect(toastSpy).toHaveBeenCalledWith(
       `View "${view.name}" saved successfully.`
     )
@@ -776,6 +787,7 @@ describe('DocumentListComponent', () => {
   })
 
   it('should hide columns if no perms or notes disabled', () => {
+    component.onGroupByChange('none')
     jest.spyOn(permissionService, 'currentUserCan').mockReturnValue(true)
     jest.spyOn(documentListService, 'documents', 'get').mockReturnValue(docs)
     expect(documentListService.sortField).toEqual('created')

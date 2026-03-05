@@ -6,7 +6,16 @@ export enum DisplayMode {
   TABLE = 'table',
   SMALL_CARDS = 'smallCards',
   LARGE_CARDS = 'largeCards',
+  FOLDERS = 'folders',
 }
+
+export type DocumentGroupBy =
+  | 'none'
+  | 'storagePath'
+  | 'correspondent'
+  | 'documentType'
+  | 'createdYear'
+  | 'createdMonth'
 
 export enum DisplayField {
   TITLE = 'title',
@@ -89,6 +98,7 @@ export const DOCUMENT_SORT_FIELDS = [
   { field: 'correspondent__name', name: $localize`Correspondent` },
   { field: 'title', name: $localize`Title` },
   { field: 'document_type__name', name: $localize`Document type` },
+  { field: 'storage_path__name', name: $localize`Storage path` },
   { field: 'created', name: $localize`Created` },
   { field: 'added', name: $localize`Added` },
   { field: 'modified', name: $localize`Modified` },
@@ -141,6 +151,8 @@ export interface Document extends ObjectWithPermissions {
   original_file_name?: string
 
   archived_file_name?: string
+
+  archived_file_path?: string
 
   download_url?: string
 
