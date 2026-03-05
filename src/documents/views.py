@@ -487,13 +487,13 @@ class TagViewSet(PermissionsAwareDocumentCountMixin, ModelViewSet):
             user = getattr(getattr(self, "request", None), "user", None)
             children_source = list(
                 annotate_document_count_for_related_queryset(
-                    Tag.objects.filter(pk__in=descendant_pks | {t.pk for t in all_tags})
-                    .select_related("owner")
-                    .order_by(*ordering),
+                    Tag.objects.filter(
+                        pk__in=descendant_pks | {t.pk for t in all_tags},
+                    ).select_related("owner"),
                     through_model=self.document_count_through,
                     related_object_field=self.document_count_source_field,
                     user=user,
-                ),
+                ).order_by(*ordering),
             )
         else:
             children_source = all_tags
@@ -1850,6 +1850,13 @@ class SelectionDataView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
 
         ids = serializer.validated_data.get("documents")
+        permitted_documents = get_objects_for_user_owner_aware(
+            request.user,
+            "documents.view_document",
+            Document,
+        )
+        if permitted_documents.filter(pk__in=ids).count() != len(ids):
+            return HttpResponseForbidden("Insufficient permissions")
 
         correspondents = Correspondent.objects.annotate(
             document_count=Count(
